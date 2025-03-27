@@ -41,19 +41,23 @@
                 <td>@student.LastName</td>
                 <td>@student.FirstName</td>
                 <td>@student.MiddleName</td>
-                <td>@student.BirthDate</td>
-                <td>@student.Class?.Name</td>
-                <td>@student.Class?.Teacher?.FullName</td>
+                <td>@student.BirthDate.ToString("dd.MM.yyyy")</td>
+                <td>@student.Class.Name</td>
+                <td>@(student.Class.Teacher != null ? student.Class.Teacher.FullName : "Не назначен")</td>
+                <td>
+                    <form asp-action="Delete" asp-route-id="@student.Id" method="post" style="display:inline;">
                 <td>
                     <a href="/Students/Delete/@student.Id" onclick="return confirm('Вы уверены, что хотите удалить ученика?')" class="btn btn-danger btn-sm">Удалить</a>
+                </td>
+                        @Html.AntiForgeryToken()
+                    </form>
                 </td>
             </tr>
         }
     </tbody>
 </table>
 
-<a href="/Students/Create" class="btn btn-primary">Добавить ученика</a>
-
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+<div class="mb-3">
+    <a href="/Students/Create" class="btn btn-primary">Добавить ученика</a>
+    <a href="/Reports" class="btn btn-info">Посмотреть отчёты</a>
+</div>
