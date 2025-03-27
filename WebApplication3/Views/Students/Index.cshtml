@@ -41,7 +41,7 @@
                 <td>@student.LastName</td>
                 <td>@student.FirstName</td>
                 <td>@student.MiddleName</td>
-                <td>@(student.BirthDate.HasValue ? student.BirthDate.Value.ToShortDateString() : "Не указано")</td>
+                <td>@student.BirthDate</td>
                 <td>@student.Class?.Name</td>
                 <td>@student.Class?.Teacher?.FullName</td>
                 <td>

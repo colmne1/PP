@@ -56,6 +56,17 @@ namespace WebApplication3.Controllers
         {
             // Логируем входящие данные
             System.Diagnostics.Debug.WriteLine($"Received student: LastName={student.LastName}, FirstName={student.FirstName}, MiddleName={student.MiddleName}, BirthDate={student.BirthDate}, ClassId={student.ClassId}");
+            var existingStudent = _context.Students
+        .FirstOrDefault(s => s.LastName == student.LastName &&
+                             s.FirstName == student.FirstName &&
+                             s.MiddleName == student.MiddleName &&
+                             s.BirthDate == student.BirthDate);
+            if (existingStudent != null)
+            {
+                ModelState.AddModelError("", "Ученик с таким ФИО и датой рождения уже существует.");
+            }
+
+
 
             if (!ModelState.IsValid)
             {
