@@ -1,0 +1,32 @@
+﻿@model WebApplication3.Models.Class
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>Назначить классного руководителя для @ViewBag.ClassName</h2>
+
+<form action="/Classes/AssignTeacher/@Model.Id" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <div class="form-group">
+        <label>Классный руководитель</label>
+        <select name="teacherId" class="form-control" required>
+            <option value="">Выберите преподавателя</option>
+            @if (ViewBag.Teachers != null)
+            {
+                @foreach (var teacher in ViewBag.Teachers as List<WebApplication3.Models.Teacher>)
+                {
+                    <option value="@teacher.Id">@teacher.FullName</option>
+                }
+            }
+            else
+            {
+                <option value="">Преподаватели не найдены</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary mt-2">Назначить</button>
+    <a href="/Classes" class="btn btn-secondary mt-2">Отмена</a>
+    @Html.AntiForgeryToken()
+</form>
