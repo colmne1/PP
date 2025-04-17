@@ -1,16 +1,18 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
+using WebApplication3.Data;
+using WebApplication3.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace WebApplication3.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly SchoolDbContext _context;
 
-        public AccountController(SignInManager<IdentityUser> signInManager)
+        public AccountController(SchoolDbContext context)
         {
-            _signInManager = signInManager;
+            _context = context;
         }
 
         public IActionResult Login()
@@ -21,18 +23,25 @@ namespace WebApplication3.Controllers
         [HttpPost]
         public async Task<IActionResult> Login(string username, string password)
         {
-            var result = await _signInManager.PasswordSignInAsync(username, password, false, false);
-            if (result.Succeeded)
+            // Проверяем, существует ли пользователь с таким логином и паролем
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Login == username && u.Password == password);
+
+            if (user != null)
             {
+                // Устанавливаем состояние аутентификации
+                Startup.IsAuthenticated = true;
                 return RedirectToAction("Index", "Students");
             }
+
             ModelState.AddModelError("", "Неверный логин или пароль");
             return View();
         }
 
-        public async Task<IActionResult> Logout()
+        public IActionResult Logout()
         {
-            await _signInManager.SignOutAsync();
+            // Сбрасываем состояние аутентификации
+            Startup.IsAuthenticated = false;
             return RedirectToAction("Login");
         }
 
