@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using WebApplication3.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace WebApplication3.Data
 {
-    public class SchoolDbContext : DbContext
+    public class SchoolDbContext : IdentityDbContext<IdentityUser>
     {
         public SchoolDbContext(DbContextOptions<SchoolDbContext> options) : base(options)
         {
