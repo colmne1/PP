@@ -2,16 +2,15 @@
 
 namespace WebApplication3.Controllers
 {
-    public class HomeController : Controller
+    [Route("api/[controller]")]
+    [ApiController]
+    public class HomeController : ControllerBase
     {
-        public IActionResult Index()
+        // GET: api/home
+        [HttpGet]
+        public IActionResult Get()
         {
-            return View();
-        }
-
-        public IActionResult Error()
-        {
-            return View();
+            return Ok(new { Message = "API is running" });
         }
     }
 }

@@ -1,13 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System;
+using System.Threading.Tasks;
 using WebApplication3.Data;
 using WebApplication3.Models;
-using System.Linq;
-using System;
 
 namespace WebApplication3.Controllers
 {
-    public class ClassesController : Controller
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ClassesController : ControllerBase
     {
         private readonly SchoolDbContext _context;
 
@@ -16,74 +19,43 @@ namespace WebApplication3.Controllers
             _context = context;
         }
 
-        public IActionResult Index()
+        // GET: api/classes
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Class>>> GetClasses()
         {
-            var classes = _context.Classes
+            var classes = await _context.Classes
                 .Include(c => c.Teacher)
-                .ToList();
-            return View(classes);
+                .ToListAsync();
+            return Ok(classes);
         }
 
-        public IActionResult AssignTeacher(int id)
+        // POST: api/classes/assign-teacher
+        [HttpPost("assign-teacher")]
+        public async Task<IActionResult> AssignTeacher(int classId, int teacherId)
         {
-            var classToAssign = _context.Classes.Find(id);
+            var classToAssign = await _context.Classes.FindAsync(classId);
             if (classToAssign == null)
             {
-                return NotFound();
+                return NotFound(new { Message = "Класс не найден" });
             }
 
-            var teachers = _context.Teachers.ToList();
-            if (teachers == null || !teachers.Any())
-            {
-                System.Diagnostics.Debug.WriteLine("No teachers found in the database!");
-            }
-            ViewBag.Teachers = teachers;
-            ViewBag.ClassName = classToAssign.Name;
-            return View(classToAssign);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult AssignTeacher(int id, int teacherId)
-        {
-            var classToAssign = _context.Classes.Find(id);
-            if (classToAssign == null)
-            {
-                return NotFound();
-            }
-
-            var teacher = _context.Teachers.Find(teacherId);
+            var teacher = await _context.Teachers.FindAsync(teacherId);
             if (teacher == null)
             {
-                ModelState.AddModelError("TeacherId", "Выбранный преподаватель не существует.");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                var teachers = _context.Teachers.ToList();
-                ViewBag.Teachers = teachers;
-                ViewBag.ClassName = classToAssign.Name;
-                return View(classToAssign);
+                return BadRequest(new { Message = "Преподаватель не найден" });
             }
 
             try
             {
                 classToAssign.TeacherId = teacherId;
                 _context.Update(classToAssign);
-                _context.SaveChanges();
-                System.Diagnostics.Debug.WriteLine($"Teacher {teacherId} assigned to class {id} successfully!");
+                await _context.SaveChangesAsync();
+                return Ok(new { Message = "Учитель успешно назначен" });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error assigning teacher: {ex.Message}");
-                ModelState.AddModelError("", "Ошибка при назначении классного руководителя: " + ex.Message);
-                var teachers = _context.Teachers.ToList();
-                ViewBag.Teachers = teachers;
-                ViewBag.ClassName = classToAssign.Name;
-                return View(classToAssign);
+                return StatusCode(500, new { Message = $"Ошибка: {ex.Message}" });
             }
-
-            return RedirectToAction(nameof(Index));
         }
     }
 }

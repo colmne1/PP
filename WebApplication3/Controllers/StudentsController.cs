@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WebApplication3.Data;
@@ -7,7 +9,10 @@ using WebApplication3.Models;
 
 namespace WebApplication3.Controllers
 {
-    public class StudentsController : Controller
+    [Authorize]
+    [Route("api/[controller]")]
+    [ApiController]
+    public class StudentsController : ControllerBase
     {
         private readonly SchoolDbContext _context;
 
@@ -16,138 +21,73 @@ namespace WebApplication3.Controllers
             _context = context;
         }
 
-        // GET: Students
-        public async Task<IActionResult> Index(int? classId)
+        // GET: api/students
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Student>>> GetStudents([FromQuery] int? classId)
         {
-            ViewBag.Classes = await _context.Classes.ToListAsync();
-            ViewBag.classId = classId;
-
-            var students = _context.Students
+            IQueryable<Student> query = _context.Students
                 .Include(s => s.Class)
-                .ThenInclude(c => c.Teacher)
-                .AsQueryable();
+                .ThenInclude(c => c.Teacher);
 
             if (classId.HasValue)
             {
-                students = students.Where(s => s.ClassId == classId.Value);
+                query = query.Where(s => s.ClassId == classId.Value);
             }
 
-            return View(await students.ToListAsync());
+            var students = await query.ToListAsync();
+            return Ok(students);
         }
 
-        // GET: Students/Create
-        public IActionResult Create()
+        // GET: api/students/classes
+        [HttpGet("classes")]
+        public async Task<ActionResult<IEnumerable<Class>>> GetClasses()
         {
-            ViewBag.Classes = _context.Classes.ToList();
-            return View();
+            var classes = await _context.Classes
+                .Include(c => c.Teacher)
+                .ToListAsync();
+
+            return Ok(classes);
         }
 
-        // POST: Students/Create
+        // POST: api/students
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Student student)
+        public async Task<ActionResult<Student>> PostStudent(Student student)
         {
-            if (ModelState.IsValid)
-            {
-                _context.Add(student);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            ViewBag.Classes = await _context.Classes.ToListAsync();
-            return View(student);
+            _context.Students.Add(student);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetStudents), new { id = student.Id }, student);
         }
 
-        // GET: Students/Delete/5
-        public async Task<IActionResult> Delete(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var student = await _context.Students
-                .Include(s => s.Class)
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (student == null)
-            {
-                return NotFound();
-            }
-
-            return View(student);
-        }
-
-        // POST: Students/Delete/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var student = await _context.Students.FindAsync(id);
-            if (student != null)
-            {
-                _context.Students.Remove(student);
-                await _context.SaveChangesAsync();
-            }
-            return RedirectToAction(nameof(Index));
-        }
-
-        // GET: Students/Edit/5
-        public async Task<IActionResult> Edit(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var student = await _context.Students
-                .Include(s => s.Class) // Загружаем данные о классе
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (student == null)
-            {
-                return NotFound();
-            }
-
-            ViewBag.Classes = await _context.Classes.ToListAsync();
-            return View(student);
-        }
-
-        // POST: Students/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Student student)
+        // PUT: api/students/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutStudent(int id, Student student)
         {
             if (id != student.Id)
             {
+                return BadRequest();
+            }
+
+            _context.Entry(student).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // DELETE: api/students/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStudent(int id)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null)
+            {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    _context.Update(student);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!StudentExists(student.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
+            _context.Students.Remove(student);
+            await _context.SaveChangesAsync();
 
-            ViewBag.Classes = await _context.Classes.ToListAsync();
-            return View(student);
-        }
-
-        private bool StudentExists(int id)
-        {
-            return _context.Students.Any(e => e.Id == id);
+            return NoContent();
         }
     }
 }

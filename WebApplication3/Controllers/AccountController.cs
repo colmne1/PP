@@ -1,53 +1,75 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using WebApplication3.Data;
-using WebApplication3.Models;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using WebApplication3.Models;
+using Microsoft.Extensions.Configuration;
+using System; // Добавляем пространство имён для DateTime
 
 namespace WebApplication3.Controllers
 {
-    public class AccountController : Controller
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AccountController : ControllerBase
     {
         private readonly SchoolDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AccountController(SchoolDbContext context)
+        public AccountController(SchoolDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
-        public IActionResult Login()
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            return View();
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Login(string username, string password)
-        {
-            // Проверяем, существует ли пользователь с таким логином и паролем
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Login == username && u.Password == password);
-
-            if (user != null)
+            if (model == null || string.IsNullOrEmpty(model.Username) || string.IsNullOrEmpty(model.Password))
             {
-                // Устанавливаем состояние аутентификации
-                Startup.IsAuthenticated = true;
-                return RedirectToAction("Index", "Students");
+                return BadRequest(new { Message = "Логин и пароль обязательны" });
             }
 
-            ModelState.AddModelError("", "Неверный логин или пароль");
-            return View();
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Login == model.Username && u.Password == model.Password);
+
+            if (user == null)
+            {
+                return Unauthorized(new { Message = "Неверный логин или пароль" });
+            }
+
+            var token = GenerateJwtToken(user);
+            return Ok(new { Token = token });
         }
 
-        public IActionResult Logout()
+        private string GenerateJwtToken(User user)
         {
-            // Сбрасываем состояние аутентификации
-            Startup.IsAuthenticated = false;
-            return RedirectToAction("Login");
-        }
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Name, user.Login),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+            };
 
-        public IActionResult AccessDenied()
-        {
-            return View();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddHours(1), // Теперь DateTime доступен
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
     }
 }

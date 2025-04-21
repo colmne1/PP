@@ -6,6 +6,5 @@ namespace WebApplication3.Models
     {
         public int Id { get; set; }
         public string FullName { get; set; } // Оставляем только FullName, убираем FirstName, LastName, MiddleName
-        public List<Class> Classes { get; set; } = new List<Class>();
     }
 }

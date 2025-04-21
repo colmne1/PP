@@ -1,15 +1,15 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
 using System.Globalization;
-using System.Threading.Tasks;
-using WebApplication3.Data;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+using WebApplication3.Data; // Добавляем для Newtonsoft.Json
 
 public class Startup
 {
@@ -20,20 +20,49 @@ public class Startup
 
     public IConfiguration Configuration { get; }
 
-    // Статическая переменная для хранения состояния аутентификации
-    public static bool IsAuthenticated { get; set; } = false; // Изменили private set на public set
-
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddDbContext<SchoolDbContext>(options =>
             options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
 
-        services.AddControllersWithViews()
-            .AddViewLocalization()
-            .AddDataAnnotationsLocalization();
+        services.AddControllers()
+            .AddNewtonsoftJson(options =>
+            {
+                options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore; // Игнорируем циклические ссылки
+                options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore; // Игнорируем null-поля
+            });
+
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = Configuration["Jwt:Issuer"],
+                ValidAudience = Configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    System.Text.Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
+            };
+        });
+
+        services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAll", builder =>
+            {
+                builder.AllowAnyOrigin()
+                       .AllowAnyMethod()
+                       .AllowAnyHeader();
+            });
+        });
 
         services.AddLocalization(options => options.ResourcesPath = "Resources");
-        services.AddRazorPages();
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -46,64 +75,41 @@ public class Startup
             SupportedUICultures = supportedCultures
         });
 
-        app.Use(async (context, next) =>
-        {
-            context.Request.ContentType = "application/x-www-form-urlencoded; charset=UTF-8";
-            var form = await context.Request.ReadFormAsync();
-            context.Request.Form = form;
-            await next.Invoke();
-        });
-
-        // Middleware для проверки аутентификации
-        app.Use(async (context, next) =>
-        {
-            // Разрешаем доступ к странице логина и AccessDenied без проверки
-            if (context.Request.Path.StartsWithSegments("/Account/Login") ||
-                context.Request.Path.StartsWithSegments("/Account/AccessDenied"))
-            {
-                await next.Invoke();
-                return;
-            }
-
-            // Если пользователь не аутентифицирован, перенаправляем на страницу логина
-            if (!IsAuthenticated)
-            {
-                context.Response.Redirect("/Account/Login");
-                return;
-            }
-
-            await next.Invoke();
-        });
-
-        // Добавляем заголовок Cache-Control
-        app.Use(async (context, next) =>
-        {
-            context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-            context.Response.Headers["Pragma"] = "no-cache";
-            context.Response.Headers["Expires"] = "0";
-            await next.Invoke();
-        });
-
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
         }
         else
         {
-            app.UseExceptionHandler("/Home/Error");
+            app.UseExceptionHandler(errorApp =>
+            {
+                errorApp.Run(async context =>
+                {
+                    context.Response.StatusCode = 500;
+                    await context.Response.WriteAsync("Произошла ошибка. Пожалуйста, попробуйте позже.");
+                });
+            });
             app.UseHsts();
         }
 
         app.UseHttpsRedirection();
         app.UseStaticFiles();
+
         app.UseRouting();
+
+        app.UseCors("AllowAll");
+
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         app.UseEndpoints(endpoints =>
         {
-            endpoints.MapControllerRoute(
-                name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
-            endpoints.MapRazorPages();
+            endpoints.MapControllers();
+
+            endpoints.MapGet("/", async context =>
+            {
+                context.Response.Redirect("/index.html");
+            });
         });
     }
 }
